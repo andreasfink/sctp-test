@@ -1,5 +1,9 @@
 
-#if defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
+#define HAS_SOCKLEN 1
+#endif
+
+ #if defined(__APPLE__)
 #if !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE    200809L
 #endif
@@ -11,6 +15,7 @@
 
 #include <netdb.h>
 #include <sys/poll.h>
+#include <netinet/in.h>
 #ifdef __APPLE__
 #include <sctp/sctp.h>
 #else
@@ -24,7 +29,7 @@
 #include <fcntl.h>
 #include <err.h>
 #include <unistd.h>
-
+#include <termios.h>
 
 int handleNotification(void *data, ssize_t data_size, struct sctp_sndrcvinfo *sinfo);
 int isDataAvailable(int _socket, int timeoutInMs);
@@ -36,13 +41,8 @@ void setLingerTime(int _socket, int linger_time);
 void setReuseAddr(int _socket);
 void setReusePort(int _socket);
 void setNodelay(int _socket);
+void printStatus(int _socket);
 
-/* returns
- negative: error code
- 0: no data available. timeout occured
- 1: has data
- 2: has data and hup
- */
 
 #define    NO_DATA_AVAILABLE        0
 #define    DATA_AVAILABLE           1
@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     int                 err;
     sctp_assoc_t        assoc;
     int                 avail = 0;
+    struct termios      terminal_attributes;
     
     if(argc<5)
     {
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
     
     memset(&local_addr6,0x00,sizeof(local_addr6));
     local_addr6.sin6_family = AF_INET6;
-#ifdef __APPLE__
+#ifdef HAS_SOCKLEN
     local_addr6.sin6_len         = sizeof(struct sockaddr_in6);
 #endif
     local_addr6.sin6_port = htons(source_port);
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
     
     memset(&remote_addr6,0x00,sizeof(remote_addr6));
     remote_addr6.sin6_family = AF_INET6;
-#ifdef __APPLE__
+#ifdef HAS_SOCKLEN
     remote_addr6.sin6_len         = sizeof(struct sockaddr_in6);
 #endif
     remote_addr6.sin6_port = htons(destination_port);
@@ -154,6 +155,11 @@ int main(int argc, char *argv[])
     
     avail = 0;
     err = 0;
+    
+    tcgetattr(STDIN_FILENO, &terminal_attributes);
+    terminal_attributes.c_lflag = terminal_attributes.c_lflag & (~ICANON); /* we go to character by character mode */
+    tcsetattr(STDIN_FILENO, TCSANOW, &terminal_attributes);
+
     while((avail>=0) && (err>=0))
     {
         int avail_stdin = isDataAvailable(STDIN_FILENO,0); /* standard input */
@@ -162,6 +168,15 @@ int main(int argc, char *argv[])
             char buffer[2048];
             bzero(&buffer,sizeof(buffer));
             ssize_t read_bytes = read(STDIN_FILENO,&buffer,sizeof(buffer)-1);
+            if(read_bytes==1)
+            {
+                if(buffer[0] == 0x1B)
+                {
+                    /* a single escape character */
+                    printStatus(_socket);
+                    
+                }
+            }
             if(read_bytes > 0)
             {
                 ssize_t written_bytes = write(_socket,&buffer,read_bytes);
@@ -188,6 +203,14 @@ int main(int argc, char *argv[])
         }
     }
 }
+
+
+/* returns
+ negative: error code
+ 0: no data available. timeout occured
+ 1: has data
+ 2: has data and hup
+ */
 
 int isDataAvailable(int _socket, int timeoutInMs)
 {
@@ -708,4 +731,29 @@ void setNodelay(int _socket)
     {
         fprintf(stderr,"setsockopt(SCTP_NODELAY) successful\n");
     }
+}
+
+void printStatus(int _socket)
+{
+    struct sctp_status status;
+    socklen_t opt_len;
+    
+    memset((void *)&status, 0, sizeof(struct sctp_status));
+    opt_len = (socklen_t)sizeof(struct sctp_status);
+    if (getsockopt(_socket, IPPROTO_SCTP, SCTP_STATUS, &status, &opt_len) < 0)
+    {
+        perror("getsockopt");
+    }
+    fprintf(stderr,"----SCTP-STATUS-----------------------------------\n");
+    fprintf(stderr,"status.sstat_assoc_id = %lu\n",(unsigned long)status.sstat_assoc_id);
+    fprintf(stderr,"status.sstat_state = %lu\n", (unsigned long)status.sstat_state);
+    fprintf(stderr,"status.sstat_rwnd = %lu\n", (unsigned long)status.sstat_rwnd);
+    fprintf(stderr,"status.sstat_unackdata = %lu\n", (unsigned long)status.sstat_unackdata);
+    fprintf(stderr,"status.sstat_penddata = %lu\n", (unsigned long)status.sstat_penddata);
+    fprintf(stderr,"status.sstat_instrms = %lu\n", (unsigned long)status.sstat_instrms);
+    fprintf(stderr,"status.sstat_outstrms = %lu\n", (unsigned long)status.sstat_outstrms);
+    fprintf(stderr,"status.sstat_fragmentation_point = %lu\n", (unsigned long)status.sstat_fragmentation_point);
+    fprintf(stderr,"--------------------------------------------------\n");
+
+
 }

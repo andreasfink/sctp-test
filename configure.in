@@ -158,6 +158,9 @@ case "$host" in
   *-linux-*)
     cp Makefile.linux Makefile
     ;;
+  *)
+    cp Makefile.linux Makefile
+    ;;
 esac
 
 dnl LICENSE notice
