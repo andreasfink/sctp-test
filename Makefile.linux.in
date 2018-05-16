@@ -1,0 +1,34 @@
+# File: Makefile
+# Project "sctp-test"
+# Copyright: © 2018 Andreas Fink (andreas@fink.org), Basel, Switzerland. All rights reserved.
+#
+#
+
+CC=@CC@
+CFLAGS=@CFLAGS@ -D_POSIX_SOURCE
+LDFLAGS=@LDFLAGS@
+LIBS=@LIBS@
+
+CFILES = src/sctp-test.c
+OFILES  = $(CFILES:.c=.o)
+INCLUDEDIRS=
+EXE=sctp-test
+
+#
+# special compilation rule for this debug object so it can contain retain/release stuff
+#
+
+${EXE}: ${OFILES}
+	${CC} -o ${EXE}  ${LDFLAGS} ${OFILES} ${LIBS} ${STATIC_LIBS}
+
+
+clean:
+	rm -f $(LIB) $(OFILES)
+
+.SUFFIXES: .o .c
+
+%.o:	%.c
+	${CC} -c ${CFLAGS}  $<  ${INCLUDEDIRS} -o $@
+
+
+

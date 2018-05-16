@@ -1,0 +1,29 @@
+##
+# File: Makefile
+# Project "ulib"
+# Copyright: © 2017 Andreas Fink (andreas@fink.org), Basel, Switzerland. All rights reserved.
+#
+
+PROJECT_NAME=@PROJECT_NAME@
+EXE=@PROJECT_NAME@
+PROJECT_ID=me.fink.@PROJECT_NAME@
+CONFIGURATION=@CONFIGURATION@
+CC=@CC@
+BUILD_DIR=build
+
+all:
+	xcodebuild ${XCODESIGN} $(CONFIGURATION) ${XCODESIGN}
+	
+clean:
+	rm -rf $(BUILD_DIR)
+	xcodebuild $(CONFIGURATION) clean
+
+install:
+	xcodebuild ${XCODESIGN} $(CONFIGURATION)  ${XCODESIGN} install
+
+
+install_root_prepare:
+	-rm -rf install_root
+	mkdir -p install_root
+	xcodebuild ${XCODESIGN} DSTROOT="install_root" install
+
