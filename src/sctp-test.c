@@ -1,5 +1,5 @@
 
-#if defined(__FreeBSD__) || defined(__APPLE__)
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #define HAS_SOCKLEN 1
 #endif
 
