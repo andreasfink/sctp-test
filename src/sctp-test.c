@@ -147,8 +147,15 @@ int main(int argc, char *argv[])
     err =  sctp_connectx(_socket,(struct sockaddr *)&remote_addr6,1,&assoc);
     if(err!=0)
     {
-        fprintf(stderr,"sctp_connectx failed (%d %s)\n",errno,strerror(errno));
-        exit(EXIT_FAILURE);
+        if(errno==EINPROGRESS)
+        {
+            fprintf(stderr,"sctp_connectx returns (%d %s)\n",errno,strerror(errno));
+        }
+        else
+        {
+            fprintf(stderr,"sctp_connectx failed (%d %s)\n",errno,strerror(errno));
+            exit(EXIT_FAILURE);
+        }
     }
     
     printf("sctp_connectx() successful\n");
