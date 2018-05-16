@@ -736,14 +736,14 @@ void setNodelay(int _socket)
 void setIPDualStack(int _socket)
 {
     int flag = 0;
-    int err = setsockopt(_socket, SOL_SOCKET, IPV6_V6ONLY, (char *)&flag, sizeof(flag));
+    int err = setsockopt(_socket, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&flag, sizeof(flag));
     if(err !=0)
     {
-        fprintf(stderr,"setsockopt(SOL_SOCKET,IPV6_V6ONLY,0) failed %d %s\n",errno,strerror(errno));
+        fprintf(stderr,"setsockopt(IPPROTO_IPV6,IPV6_V6ONLY,0) failed %d %s\n",errno,strerror(errno));
     }
     else
     {
-        fprintf(stderr,"setsockopt(SOL_SOCKET,IPV6_V6ONLY,0) successful\n");
+        fprintf(stderr,"setsockopt(IPPROTO_IPV6,IPV6_V6ONLY,0) successful\n");
     }
 }
 
