@@ -23,7 +23,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <err.h>
-
+#include <unistd.h>
 
 #define _POSIX_C_SOURCE    1 /* to make sure linger time is in seconds under OS X */
 #undef _DARWIN_C_SOURCE
@@ -159,6 +159,22 @@ int main(int argc, char *argv[])
     err = 0;
     while((avail>=0) && (err>=0))
     {
+        int avail_stdin = isDataAvailable(STDIN_FILENO,0); /* standard input */
+        if(avail_stdin)
+        {
+            char buffer[2048];
+            bzero(&buffer,sizeof(buffer));
+            ssize_t read_bytes = read(STDIN_FILENO,&buffer,sizeof(buffer)-1);
+            if(read_bytes > 0)
+            {
+                ssize_t written_bytes = write(_socket,&buffer,read_bytes);
+                if(written_bytes > 0)
+                {
+                    fprintf(stderr,"{sent %d bytes}\n",(int)written_bytes);
+                }
+            }
+        }
+
         int avail = isDataAvailable(_socket,2000);
         if(avail<0)
         {
@@ -677,6 +693,9 @@ void setReusePort(int _socket)
     {
         fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT) successful\n");
     }
+#else
+    fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT) not supported\n");
+
 #endif
 }
 
