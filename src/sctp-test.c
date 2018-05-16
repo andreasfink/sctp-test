@@ -42,6 +42,7 @@ void setReuseAddr(int _socket);
 void setReusePort(int _socket);
 void setNodelay(int _socket);
 void printStatus(int _socket);
+void setIPDualStack(int _socket);
 
 
 #define    NO_DATA_AVAILABLE        0
@@ -121,14 +122,13 @@ int main(int argc, char *argv[])
     printf("setting socket to non blocking\n");
     
     /******* setting optinos *************/
-
+    setIPDualStack(_socket);
     setBlocking(_socket,0);
     enableSctpEvents(_socket);
     setLingerTime(_socket, 5);
     setReuseAddr(_socket);
     setReusePort(_socket);
     setNodelay(_socket);
-
     
     
     /******* bind() *************/
@@ -605,23 +605,22 @@ int handleNotification(void *data, ssize_t data_size, struct sctp_sndrcvinfo *si
 void setBlocking(int _socket, int set)
 {
     int err = 0;
-    fprintf(stderr,"setting socket to blocking=%d\n",set);
     int flags = fcntl(_socket, F_GETFL, 0);
     if(set)
     {
-        err = fcntl(_socket, F_SETFL, flags  | O_NONBLOCK);
+        err = fcntl(_socket, F_SETFL, flags  & ~O_NONBLOCK);
     }
     else
     {
-        err = fcntl(_socket, F_SETFL, flags  & ~O_NONBLOCK);
+        err = fcntl(_socket, F_SETFL, flags  | O_NONBLOCK);
     }
     if(err==0)
     {
-        fprintf(stderr,"fcntl successful\n");
+        fprintf(stderr,"socket set to %sblocking mode successful\n",(set ? "" : "non "));
     }
     else
     {
-        fprintf(stderr,"fcntl failed %d %s\n",errno,strerror(errno));
+        fprintf(stderr,"changing to %sblocking mode on socket failed %d %s\n",(set ? "" : "non "), errno,strerror(errno));
     }
     
 }
@@ -659,6 +658,7 @@ void enableSctpEvents(int _socket)
         fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_EVENTS) successful\n");
     }
 }
+
 void setLingerTime(int _socket, int linger_time)
 {
     int err;
@@ -691,11 +691,11 @@ void setReuseAddr(int _socket)
     int err = setsockopt(_socket, SOL_SOCKET, SO_REUSEADDR, (char *)&flags, sizeof(flags));
     if(err !=0)
     {
-        fprintf(stderr,"setsockopt(,SOL_SOCKET,SO_REUSEADDR) failed %d %s\n",errno,strerror(errno));
+        fprintf(stderr,"setsockopt(,SOL_SOCKET,SO_REUSEADDR,1) failed %d %s\n",errno,strerror(errno));
     }
     else
     {
-        fprintf(stderr,"setsockopt(SOL_SOCKET,SO_REUSEADDR) successful\n");
+        fprintf(stderr,"setsockopt(SOL_SOCKET,SO_REUSEADDR,1) successful\n");
     }
 }
 
@@ -707,14 +707,14 @@ void setReusePort(int _socket)
     int err = setsockopt(_socket, IPPROTO_SCTP, SCTP_REUSE_PORT, (char *)&flags, sizeof(flags));
     if(err !=0)
     {
-        fprintf(stderr,"setsockopt(,IPPROTO_SCTP,SCTP_REUSE_PORT) failed %d %s\n",errno,strerror(errno));
+        fprintf(stderr,"setsockopt(,IPPROTO_SCTP,SCTP_REUSE_PORT,1) failed %d %s\n",errno,strerror(errno));
     }
     else
     {
-        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT) successful\n");
+        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT,1) successful\n");
     }
 #else
-    fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT) not supported\n");
+    fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_REUSE_PORT,1) not supported on platform\n");
 
 #endif
 }
@@ -725,11 +725,25 @@ void setNodelay(int _socket)
     int err = setsockopt(_socket, IPPROTO_SCTP, SCTP_NODELAY, (char *)&flags, sizeof(flags));
     if(err !=0)
     {
-        fprintf(stderr,"setsockopt(SCTP_NODELAY) failed %d %s\n",errno,strerror(errno));
+        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_NODELAY,1) failed %d %s\n",errno,strerror(errno));
     }
     else
     {
-        fprintf(stderr,"setsockopt(SCTP_NODELAY) successful\n");
+        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_NODELAY,1) successful\n");
+    }
+}
+
+void setIPDualStack(int _socket)
+{
+    int flag = 0;
+    int err = setsockopt(_socket, SOL_SOCKET, IPV6_V6ONLY, (char *)&flag, sizeof(flag));
+    if(err !=0)
+    {
+        fprintf(stderr,"setsockopt(SOL_SOCKET,IPV6_V6ONLY,0) failed %d %s\n",errno,strerror(errno));
+    }
+    else
+    {
+        fprintf(stderr,"setsockopt(SOL_SOCKET,IPV6_V6ONLY,0) successful\n");
     }
 }
 
