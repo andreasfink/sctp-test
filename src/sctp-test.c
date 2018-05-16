@@ -1,7 +1,7 @@
 
-#ifdef  __APPLE__
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE    1 /* to make sure linger time is in seconds under OS X */
+#if defined(__APPLE__)
+#if !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE    200809L
 #endif
 #undef _DARWIN_C_SOURCE
 #endif
@@ -25,9 +25,6 @@
 #include <err.h>
 #include <unistd.h>
 
-#define _POSIX_C_SOURCE    1 /* to make sure linger time is in seconds under OS X */
-#undef _DARWIN_C_SOURCE
-#include <sys/socket.h>
 
 int handleNotification(void *data, ssize_t data_size, struct sctp_sndrcvinfo *sinfo);
 int isDataAvailable(int _socket, int timeoutInMs);
