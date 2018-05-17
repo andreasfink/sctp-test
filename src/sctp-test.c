@@ -784,7 +784,7 @@ void startListening(int _socket)
 {
     int err;
     
-    fprintf(stderr,@"listen() ");
+    fprintf(stderr,"listen() ");
     err = listen(_socket,128);
-    fprintf(stderr,"  returns %d/%d %sn",ret1,errno,( errno ? "" :strerror(errno)));
+    fprintf(stderr,"  returns %d/%d %sn",err,errno,( errno ? "" :strerror(errno)));
 }
