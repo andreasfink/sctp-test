@@ -32,7 +32,7 @@
 #include <termios.h>
 
 int handleNotification(void *data, ssize_t data_size, struct sctp_sndrcvinfo *sinfo);
-int isDataAvailable(int _socket, int timeoutInMs);
+int isDataAvailable(int _socket, int timeoutInMs, int *hasData, int *hasHup);
 int receiveAndProcessSCTP(int _socket);
 int main(int argc, char *argv[]);
 void setBlocking(int _socket, int set);
@@ -167,10 +167,13 @@ int main(int argc, char *argv[])
     terminal_attributes.c_lflag = terminal_attributes.c_lflag & (~ICANON); /* we go to character by character mode */
     tcsetattr(STDIN_FILENO, TCSANOW, &terminal_attributes);
 
-    while((avail>=0) && (err>=0))
+    int mustQuit;
+    while(mustQuit==0)
     {
-        int avail_stdin = isDataAvailable(STDIN_FILENO,0); /* standard input */
-        if(avail_stdin)
+        int hasData = 0;
+        int hasHup=0;
+        int err = isDataAvailable(STDIN_FILENO,0,&hasData,&hasHup);
+        if(hasData)
         {
             char buffer[2048];
             bzero(&buffer,sizeof(buffer));
@@ -181,7 +184,6 @@ int main(int argc, char *argv[])
                 {
                     /* a single escape character */
                     printStatus(_socket);
-                    
                 }
             }
             if(read_bytes > 0)
@@ -194,33 +196,28 @@ int main(int argc, char *argv[])
             }
         }
 
-        int avail = isDataAvailable(_socket,2000);
-        if(avail<0)
+        hasData = 0;
+        hasHup=0;
+        err = isDataAvailable(STDIN_FILENO,2500,&hasData,&hasHup);
+        if(hasHup)
         {
-            exit(EXIT_FAILURE);
+            mustQuit = 1;
         }
-        else if(avail==0)
+        if(hasData)
         {
-            fprintf(stdout,"-");
-        }
-        else if(avail>0)
-        {
-            fprintf(stdout,"+");
             err = receiveAndProcessSCTP(_socket);
+        }
+        if(err)
+        {
+            fprintf(stderr,"{errno %d %s}\n",err,strerror(err));
         }
     }
 }
 
 
-/* returns
- negative: error code
- 0: no data available. timeout occured
- 1: has data
- 2: has data and hup
- */
-
-int isDataAvailable(int _socket, int timeoutInMs)
+int isDataAvailable(int _socket, int timeoutInMs, int *hasData, int *hasHup)
 {
+    int returnValue = 0;
     struct pollfd pollfds[1];
     int ret1;
     int ret2;
@@ -239,65 +236,67 @@ int isDataAvailable(int _socket, int timeoutInMs)
     memset(pollfds,0,sizeof(pollfds));
     pollfds[0].fd = _socket;
     pollfds[0].events = events;
+
+    fprintf(stderr,"poll (timeout =%dms,socket=%d)\n",timeoutInMs,_socket);
     
     ret1 = poll(pollfds, 1, timeoutInMs);
     
-    fprintf(stderr," poll returns %d\n",ret1);
+    fprintf(stderr,"  returns %d (errno=%d:%s)\n",ret1,errno,strerror(errno));
     
     if (ret1 < 0)
     {
         eno = errno;
-        fprintf(stderr," error %d %s\n",eno,strerror(eno));
-        return -abs(eno);
+        if((eno==EINPROGRESS) || (eno == EINTR) || (eno==EAGAIN))
+        {
+            returnValue = 0;
+        }
+        else
+        {
+            returnValue = eno;
+        }
     }
-    else if (ret1 > 0)
+    else if (ret1 == 0)
     {
-        eno = errno;
+        returnValue = 0;
+    }
+    else /* ret1 > 0 */
+    {
         /* we have some event to handle. */
         ret2 = pollfds[0].revents;
+        fprintf(stderr,"pollfds[0].revents = %d",ret2);
         if(ret2 & POLLERR)
         {
-            return -abs(eno);
-            
+            socklen_t len = sizeof(int);
+            getsockopt(_socket, SOL_SOCKET, SO_ERROR, &returnValue, &len);
         }
-        else if(ret2 & POLLHUP)
+        if(ret2 & POLLHUP)
         {
-            return DATA_AVAILABLE_AND_HUP;
+            *hasHup = 1;
         }
         
 #ifdef POLLRDHUP
-        else if(ret2 & POLLRDHUP)
+        if(ret2 & POLLRDHUP)
         {
-            return DATA_AVAILABLE_AND_HUP;
+            *hasHup = 1;
         }
 #endif
-        else if(ret2 & POLLNVAL)
+        if(ret2 & POLLNVAL)
         {
-            return -abs(eno);
+            returnValue = EINVAL;
         }
 #ifdef POLLRDBAND
-        else if(ret2 & POLLRDBAND)
+        if(ret2 & POLLRDBAND)
         {
-            return DATA_AVAILABLE;
+            *hasData = 1;
         }
 #endif
-        else if(ret2 & POLLIN)
+        /* There is data to read.*/
+        if(ret2 & (POLLIN | POLLPRI))
         {
-            return DATA_AVAILABLE;
+            *hasData = 1;
         }
-        else if(ret2 & POLLPRI)
-        {
-            return DATA_AVAILABLE;
-        }
-        /* we get alerted by poll that something happened but no data to read.
-         so we either jump out of the timeout or something bad happened which we are not catching */
-        if((eno==0) || (eno==ETIMEDOUT))
-        {
-            return NO_DATA_AVAILABLE;
-        }
-        return -abs(eno);
     }
-    return NO_DATA_AVAILABLE;
+    return returnValue;
 }
 
 #define    SCTP_RXBUF 10240
