@@ -143,9 +143,6 @@ int main(int argc, char *argv[])
     
     printf("bind() successful\n");
     
-#ifndef __APPLE__
-    startListening(_socket);
-#endif
     /******* sctp_connectx() *************/
     
     err =  sctp_connectx(_socket,(struct sockaddr *)&remote_addr6,1,&assoc);
