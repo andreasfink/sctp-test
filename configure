@@ -587,6 +587,7 @@ PACKAGE_URL=''
 ac_subst_vars='LTLIBOBJS
 LIBOBJS
 SHARED_LIBRARY_EXTENSION
+CONFIGURATION
 REVISION
 MINORVER
 MAJORVER
@@ -1830,7 +1831,7 @@ MAJORVER=`echo $VERSION | cut -f1 -d.`
 MINORVER=`echo $VERSION | cut -f2 -d.`
 REVISION=`echo $VERSION | cut -f3 -d.`
 CONFIG_HEADER=src/sctp_config.h
-
+CONFIGURATION="-configuration Release"
 
 ac_aux_dir=
 for ac_dir in . "$srcdir"/.; do
@@ -3098,6 +3099,7 @@ fi
 
 
 ./make_version
+
 
 
 
@@ -4427,6 +4429,9 @@ case "$host" in
     cp Makefile.osx Makefile
     ;;
   *-linux-*)
+    cp Makefile.linux Makefile
+    ;;
+  *)
     cp Makefile.linux Makefile
     ;;
 esac
