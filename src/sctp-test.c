@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
     printf("bind() successful\n");
     
 #ifndef __APPLE__
-    startListening();
+    startListening(_socket);
 #endif
     /******* sctp_connectx() *************/
     
