@@ -3,7 +3,7 @@
 #define HAS_SOCKLEN 1
 #endif
 
- #if defined(__APPLE__)
+#if defined(__APPLE__)
 #if !defined(_POSIX_C_SOURCE)
 #define _POSIX_C_SOURCE    200809L
 #endif
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
     terminal_attributes.c_lflag = terminal_attributes.c_lflag & (~ICANON); /* we go to character by character mode */
     tcsetattr(STDIN_FILENO, TCSANOW, &terminal_attributes);
 
-    int mustQuit;
+    int mustQuit=0;
     while(mustQuit==0)
     {
         int hasData = 0;
