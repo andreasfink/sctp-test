@@ -243,7 +243,7 @@ int isDataAvailable(int _socket, int timeoutInMs, int *hasData, int *hasHup)
 
     fprintf(stderr,"poll() ");
     ret1 = poll(pollfds, 1, timeoutInMs);
-    fprintf(stderr,"  returns %d/%d %sn",ret1,errno,( errno ? "" :strerror(errno)));
+    fprintf(stderr,"  returns %d/%d %s\n",ret1,errno,( errno ? "" :strerror(errno)));
     
     if (ret1 < 0)
     {
@@ -786,5 +786,5 @@ void startListening(int _socket)
     
     fprintf(stderr,"listen() ");
     err = listen(_socket,128);
-    fprintf(stderr,"  returns %d/%d %sn",err,errno,( errno ? "" :strerror(errno)));
+    fprintf(stderr,"  returns %d/%d %s\n",err,errno,( errno ? "" :strerror(errno)));
 }
