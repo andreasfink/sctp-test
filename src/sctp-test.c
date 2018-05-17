@@ -118,13 +118,10 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     printf("socket() successful\n");
-    
-    
-    printf("setting socket to non blocking\n");
-    
+
     /******* setting optinos *************/
-    setIPDualStack(_socket);
     setBlocking(_socket,0);
+    setIPDualStack(_socket);
     enableSctpEvents(_socket);
     setLingerTime(_socket, 5);
     setReuseAddr(_socket);
