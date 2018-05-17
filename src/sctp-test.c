@@ -43,6 +43,7 @@ void setReusePort(int _socket);
 void setNodelay(int _socket);
 void printStatus(int _socket);
 void setIPDualStack(int _socket);
+void startListening(int _socket);
 
 
 #define    NO_DATA_AVAILABLE        0
@@ -142,6 +143,9 @@ int main(int argc, char *argv[])
     
     printf("bind() successful\n");
     
+#ifndef __APPLE__
+    startListening();
+#endif
     /******* sctp_connectx() *************/
     
     err =  sctp_connectx(_socket,(struct sockaddr *)&remote_addr6,1,&assoc);
@@ -237,11 +241,9 @@ int isDataAvailable(int _socket, int timeoutInMs, int *hasData, int *hasHup)
     pollfds[0].fd = _socket;
     pollfds[0].events = events;
 
-    fprintf(stderr,"poll (timeout =%dms,socket=%d)\n",timeoutInMs,_socket);
-    
+    fprintf(stderr,"poll() ");
     ret1 = poll(pollfds, 1, timeoutInMs);
-    
-    fprintf(stderr,"  returns %d (errno=%d:%s)\n",ret1,errno,strerror(errno));
+    fprintf(stderr,"  returns %d/%d %sn",ret1,errno,( errno ? "" :strerror(errno)));
     
     if (ret1 < 0)
     {
@@ -776,4 +778,13 @@ void printStatus(int _socket)
     fprintf(stderr,"--------------------------------------------------\n");
 
 
+}
+
+void startListening(int _socket)
+{
+    int err;
+    
+    fprintf(stderr,@"listen() ");
+    err = listen(_socket,128);
+    fprintf(stderr,"  returns %d/%d %sn",ret1,errno,( errno ? "" :strerror(errno)));
 }
