@@ -675,7 +675,7 @@ void setLingerTime(int _socket, int linger_time)
     {
         xlinger.l_onoff = 1;
     }
-    xlinger.l_linger = linger_time;
+    xlinger.l_linger = linger_time *1000;
     err = setsockopt(_socket, SOL_SOCKET, SO_LINGER,  &xlinger,sizeof(xlinger));
     if(err !=0)
     {
