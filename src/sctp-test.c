@@ -44,7 +44,7 @@ void setNodelay(int _socket);
 void printStatus(int _socket);
 void setIPDualStack(int _socket);
 void startListening(int _socket);
-
+void setListenFix(int _socket);
 
 #define    NO_DATA_AVAILABLE        0
 #define    DATA_AVAILABLE           1
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     }
     
     /******* socket() *************/
-    _socket = socket(AF_INET6,SOCK_STREAM,IPPROTO_SCTP);
+    _socket = socket(AF_INET6,SOCK_SEQPACKET,IPPROTO_SCTP);
     if(_socket==-1)
     {
         fprintf(stderr,"can not open socket: %d %s\n",errno,strerror(errno));
@@ -124,6 +124,7 @@ int main(int argc, char *argv[])
     enableSctpEvents(_socket);
     setLingerTime(_socket, 5);
     setReuseAddr(_socket);
+    setReusePort(_socket);
     setReusePort(_socket);
     setNodelay(_socket);
     
@@ -149,6 +150,7 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
     printf("listen() successful\n");
+    setListenFix(_socket);
 #endif
 
     /******* sctp_connectx() *************/
@@ -159,6 +161,10 @@ int main(int argc, char *argv[])
         if(errno==EINPROGRESS)
         {
             fprintf(stderr,"sctp_connectx returns EINPROGRESS\n");
+        }
+        if(errno==EALREADY)
+        {
+            fprintf(stderr,"sctp_connectx returns EALREADY\n");
         }
         else if(errno==EISCONN)
         {
@@ -723,6 +729,21 @@ void setNodelay(int _socket)
     else
     {
         fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_NODELAY,1) successful\n");
+    }
+}
+
+
+void setListenFix(int _socket)
+{
+    int flags = 1;
+    int err = setsockopt(_socket, IPPROTO_SCTP, SCTP_LISTEN_FIX, &flags, sizeof(flags));
+    if(err !=0)
+    {
+        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_LISTEN_FIX,1) failed %d %s\n",errno,strerror(errno));
+    }
+    else
+    {
+        fprintf(stderr,"setsockopt(IPPROTO_SCTP,SCTP_LISTEN_FIX) successful\n");
     }
 }
 
