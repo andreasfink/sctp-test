@@ -61,8 +61,7 @@ int main(int argc, char *argv[])
     int                 err;
     sctp_assoc_t        assoc;
     int                 avail = 0;
-    struct termios      terminal_attributes;
-    
+
     if(argc<5)
     {
         fprintf(stderr,"Usage: %s [sourceip] [sourceport]  [destinationip] [destinationport]\n",argv[0]);
@@ -140,6 +139,17 @@ int main(int argc, char *argv[])
     
     printf("bind() successful\n");
     
+    
+	/******* listen() *************/
+    
+    err = listen(_socket, 128);
+    if(err!=0)
+    {
+        fprintf(stderr,"can not listen: %d %s\n",errno,strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    
+    printf("listen() successful\n");
     /******* sctp_connectx() *************/
     
     err =  sctp_connectx(_socket,(struct sockaddr *)&remote_addr6,1,&assoc);
@@ -161,139 +171,113 @@ int main(int argc, char *argv[])
     avail = 0;
     err = 0;
     
-    tcgetattr(STDIN_FILENO, &terminal_attributes);
-    terminal_attributes.c_lflag = terminal_attributes.c_lflag & (~ICANON); /* we go to character by character mode */
-    tcsetattr(STDIN_FILENO, TCSANOW, &terminal_attributes);
+    int	hasHup;
+	int hasData;
 
-    int mustQuit=0;
-    while(mustQuit==0)
-    {
-        int hasData = 0;
-        int hasHup=0;
-        int err = isDataAvailable(STDIN_FILENO,0,&hasData,&hasHup);
-        if(hasData)
-        {
-            char buffer[2048];
-            bzero(&buffer,sizeof(buffer));
-            ssize_t read_bytes = read(STDIN_FILENO,&buffer,sizeof(buffer)-1);
-            if(read_bytes==1)
-            {
-                if(buffer[0] == 0x1B)
-                {
-                    /* a single escape character */
-                    printStatus(_socket);
-                }
-            }
-            if(read_bytes > 0)
-            {
-                ssize_t written_bytes = write(_socket,&buffer,read_bytes);
-                if(written_bytes > 0)
-                {
-                    fprintf(stderr,"{sent %d bytes}\n",(int)written_bytes);
-                }
-            }
-        }
+    int mustQuit = 0;
+	while(mustQuit==0)
+	{
+		struct pollfd pollfds[1];
+		int ret1;
+		int ret2;
+		int eno = 0;
+		hasHup =0;
+		hasData = 0;
+		int events = POLLIN | POLLPRI | POLLERR | POLLHUP | POLLNVAL;
+	
+	#ifdef POLLRDBAND
+		events |= POLLRDBAND;
+	#endif
 
-        hasData = 0;
-        hasHup=0;
-        err = isDataAvailable(STDIN_FILENO,2500,&hasData,&hasHup);
-        if(hasHup)
-        {
-            mustQuit = 1;
-        }
-        if(hasData)
-        {
-            err = receiveAndProcessSCTP(_socket);
-        }
-        if(err)
-        {
-            fprintf(stderr,"{errno %d %s}\n",err,strerror(err));
+	#ifdef POLLRDHUP
+		events |= POLLRDHUP;
+	#endif
+	
+		memset(pollfds,0,sizeof(pollfds));
+		pollfds[0].fd = _socket;
+		pollfds[0].events = events;
+	
+		int timeoutInMs = 10000;
+
+		fprintf(stderr,"calling poll (timeout =%dms,socket=%d)\n",timeoutInMs,_socket);
+		ret1 = poll(pollfds, 1, timeoutInMs);
+		fprintf(stderr," poll returns %d (%d:%s)\n",ret1,errno,strerror(errno));
+		if (ret1 < 0)
+		{
+			eno = errno;
+			if((eno==EINPROGRESS) || (eno == EINTR) || (eno==EAGAIN))
+			{
+				continue;
+			}
+			else
+			{
+				mustQuit =1;
+				break;
+			}
+		}
+		else if (ret1 == 0)
+		{
+			/* no data. lets loop */
+			continue;
+		}
+		else /* ret1 > 0 */
+		{
+			/* we have some event to handle. */
+			ret2 = pollfds[0].revents;
+			fprintf(stderr,"pollfds[0].revents = %d\n",ret2);
+			if(ret2 & POLLERR)
+			{
+                int eno = 0;
+                socklen_t len = sizeof(int);
+                getsockopt(pollfds[0].fd, SOL_SOCKET, SO_ERROR, &eno, &len);
+                fprintf(stderr,"socket error %d %s\n",eno, strerror(eno));
+			}
+			if(ret2 & POLLHUP)
+			{
+				fprintf(stderr,"POLLHUP set");
+				hasHup = 1;
+			}
+#ifdef POLLRDHUP
+			if(ret2 & POLLRDHUP)
+			{
+				fprintf(stderr,"POLLRDHUP set\n");
+				hasHup = 1;
+			}
+#endif
+			if(ret2 & POLLNVAL)
+			{
+				fprintf(stderr,"POLLNVAL set\n");
+				break;
+			}
+#ifdef POLLRDBAND
+			if(ret2 & POLLRDBAND)
+			{
+				fprintf(stderr,"POLLRDBAND set\n");
+				hasData = 1;
+			}
+#endif
+			/* There is data to read.*/
+			if(ret2 & (POLLIN | POLLPRI))
+			{
+				hasData = 1;
+			}
+			if(hasData)
+			{
+                fprintf(stderr,"there is data to be read on socket %d\n",pollfds[0].fd);
+				if(hasHup)
+				{
+					fprintf(stderr,"...and hangup\n");
+				}
+				err = receiveAndProcessSCTP(_socket);
+				{
+					fprintf(stderr,"{errno %d %s}\n",err,strerror(err));
+				}
+			}
         }
     }
 }
 
 
-int isDataAvailable(int _socket, int timeoutInMs, int *hasData, int *hasHup)
-{
-    int returnValue = 0;
-    struct pollfd pollfds[1];
-    int ret1;
-    int ret2;
-    int eno = 0;
-    
-    int events = POLLIN | POLLPRI | POLLERR | POLLHUP | POLLNVAL;
-    
-#ifdef POLLRDBAND
-    events |= POLLRDBAND;
-#endif
-    
-#ifdef POLLRDHUP
-    events |= POLLRDHUP;
-#endif
-    
-    memset(pollfds,0,sizeof(pollfds));
-    pollfds[0].fd = _socket;
-    pollfds[0].events = events;
-
-    fprintf(stderr,"poll() ");
-    ret1 = poll(pollfds, 1, timeoutInMs);
-    fprintf(stderr,"  returns %d/%d %s\n",ret1,errno,( errno ? strerror(errno) : ""));
-    
-    if (ret1 < 0)
-    {
-        eno = errno;
-        if((eno==EINPROGRESS) || (eno == EINTR) || (eno==EAGAIN))
-        {
-            returnValue = 0;
-        }
-        else
-        {
-            returnValue = eno;
-        }
-    }
-    else if (ret1 == 0)
-    {
-        returnValue = 0;
-    }
-    else /* ret1 > 0 */
-    {
-        /* we have some event to handle. */
-        ret2 = pollfds[0].revents;
-        fprintf(stderr,"pollfds[0].revents = %d",ret2);
-        if(ret2 & POLLERR)
-        {
-            socklen_t len = sizeof(int);
-            getsockopt(_socket, SOL_SOCKET, SO_ERROR, &returnValue, &len);
-        }
-        if(ret2 & POLLHUP)
-        {
-            *hasHup = 1;
-        }
-        
-#ifdef POLLRDHUP
-        if(ret2 & POLLRDHUP)
-        {
-            *hasHup = 1;
-        }
-#endif
-        if(ret2 & POLLNVAL)
-        {
-            returnValue = EINVAL;
-        }
-#ifdef POLLRDBAND
-        if(ret2 & POLLRDBAND)
-        {
-            *hasData = 1;
-        }
-#endif
-        /* There is data to read.*/
-        if(ret2 & (POLLIN | POLLPRI))
-        {
-            *hasData = 1;
-        }
-    }
-    return returnValue;
-}
 
 #define    SCTP_RXBUF 10240
 
@@ -624,7 +608,6 @@ void setBlocking(int _socket, int set)
     {
         fprintf(stderr,"changing to %sblocking mode on socket failed %d %s\n",(set ? "" : "non "), errno,strerror(errno));
     }
-    
 }
 
 void enableSctpEvents(int _socket)
