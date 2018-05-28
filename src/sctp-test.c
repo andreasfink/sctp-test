@@ -141,15 +141,16 @@ int main(int argc, char *argv[])
     
     
 	/******* listen() *************/
-    
+#if 1
     err = listen(_socket, 128);
     if(err!=0)
     {
         fprintf(stderr,"can not listen: %d %s\n",errno,strerror(errno));
         exit(EXIT_FAILURE);
     }
-    
     printf("listen() successful\n");
+#endif
+
     /******* sctp_connectx() *************/
     
     err =  sctp_connectx(_socket,(struct sockaddr *)&remote_addr6,1,&assoc);
@@ -170,9 +171,10 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
     }
-    
-    printf("sctp_connectx() successful\n");
-    
+    else
+    {
+        printf("sctp_connectx() successful\n");
+    }
     avail = 0;
     err = 0;
     
@@ -274,8 +276,9 @@ int main(int argc, char *argv[])
 					fprintf(stderr,"...and hangup\n");
 				}
 				err = receiveAndProcessSCTP(_socket);
+                if(err<0)
 				{
-					fprintf(stderr,"{errno %d %s}\n",err,strerror(err));
+					fprintf(stderr,"{errno %d %s}\n",errno,strerror(errno));
 				}
 			}
         }
