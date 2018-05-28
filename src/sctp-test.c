@@ -157,7 +157,12 @@ int main(int argc, char *argv[])
     {
         if(errno==EINPROGRESS)
         {
-            fprintf(stderr,"sctp_connectx returns (%d %s)\n",errno,strerror(errno));
+            fprintf(stderr,"sctp_connectx returns EINPROGRESS\n");
+        }
+        else if(errno==EISCONN)
+        {
+            fprintf(stderr,"sctp_connectx returns EISCONN\n");
+
         }
         else
         {
